@@ -22,10 +22,12 @@ app.use(express.json());
 const placesRoutes = require('./routes/places');
 const adminRoutes = require('./routes/admin');
 const authRoutes = require('./routes/auth');
+const favoritesRoutes = require('./routes/favorites');
 
 app.use('/api/places', placesRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/favorites', favoritesRoutes);
 
 
 // =====================================================
