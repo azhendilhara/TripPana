@@ -1,20 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import Navbar from '../components/Navbar';
 import '../App.css';
 
 function HomePage() {
   const [places, setPlaces] = useState([]);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  const categories = [
-    'Beach',
-    'Religious / Heritage',
-    'Nature',
-    'Museum',
-    'Wildlife / Recreation'
-  ];
 
   const fetchPlaces = async (selectedCategory = category) => {
     try {
@@ -48,6 +42,21 @@ function HomePage() {
 
   useEffect(() => {
     fetchPlaces('');
+
+    // Fetch dynamic categories from the database
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/categories');
+        if (response.ok) {
+          const data = await response.json();
+          setCategories(data.map((c) => c.name));
+        }
+      } catch (err) {
+        console.error('Error loading dynamic categories:', err);
+      }
+    };
+
+    fetchCategories();
   }, []);
 
   const handleSearch = (e) => {
@@ -63,18 +72,7 @@ function HomePage() {
   return (
     <div className="app">
 
-      <nav className="navbar">
-        <div className="logo">
-          Trip<span>Pana</span>
-        </div>
-
-        <div className="nav-links">
-          <Link to="/">Home</Link>
-          <a href="#places">Explore</a>
-          <Link to="/itinerary">Itinerary</Link>
-          <a href="#">Login</a>
-        </div>
-      </nav>
+      <Navbar />
 
       <section className="hero">
         <div className="hero-overlay">
