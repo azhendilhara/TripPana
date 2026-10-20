@@ -146,6 +146,77 @@ router.get('/:id', (req, res) => {
 
 
 // =====================================================
+// GET APPROVED REVIEWS FOR PLACE
+// Public route
+// GET /api/places/:id/reviews
+// =====================================================
+
+router.get('/:id/reviews', (req, res) => {
+
+    const placeId = Number(req.params.id);
+
+    if (isNaN(placeId)) {
+        return res.status(400).json({
+            message: 'Invalid place ID'
+        });
+    }
+
+    const reviewsSql = `
+        SELECT
+            r.review_id,
+            r.place_id,
+            r.rating,
+            r.comment,
+            r.created_at,
+            u.user_id,
+            u.name AS user_name
+        FROM reviews r
+        INNER JOIN users u ON r.user_id = u.user_id
+        WHERE r.place_id = ? AND r.status = 'approved'
+        ORDER BY r.created_at DESC;
+    `;
+
+    const statsSql = `
+        SELECT
+            COUNT(*) AS total_reviews,
+            COALESCE(AVG(rating), 0) AS average_rating
+        FROM reviews
+        WHERE place_id = ? AND status = 'approved';
+    `;
+
+    db.query(reviewsSql, [placeId], (err, reviews) => {
+        if (err) {
+            console.error('Error fetching approved reviews:', err);
+            return res.status(500).json({
+                message: 'Failed to retrieve reviews'
+            });
+        }
+
+        db.query(statsSql, [placeId], (statsErr, statsResult) => {
+            if (statsErr) {
+                console.error('Error calculating review stats:', statsErr);
+                return res.status(500).json({
+                    message: 'Failed to retrieve review statistics'
+                });
+            }
+
+            const totalReviews = statsResult[0].total_reviews;
+            const averageRating = Number(Number(statsResult[0].average_rating).toFixed(1));
+
+            return res.json({
+                stats: {
+                    totalReviews,
+                    averageRating
+                },
+                reviews
+            });
+        });
+    });
+
+});
+
+
+// =====================================================
 // ADD NEW PLACE
 // Admin only
 // =====================================================

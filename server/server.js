@@ -23,11 +23,13 @@ const placesRoutes = require('./routes/places');
 const adminRoutes = require('./routes/admin');
 const authRoutes = require('./routes/auth');
 const favoritesRoutes = require('./routes/favorites');
+const reviewsRoutes = require('./routes/reviews');
 
 app.use('/api/places', placesRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/favorites', favoritesRoutes);
+app.use('/api/reviews', reviewsRoutes);
 
 
 // =====================================================
