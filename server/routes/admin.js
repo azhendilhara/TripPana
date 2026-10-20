@@ -89,6 +89,44 @@ router.post('/login', (req, res) => {
 
 
 // =====================================================
+// GET ADMIN DASHBOARD OVERVIEW METRICS
+// Admin only (verifyAdmin)
+// GET /api/admin/stats
+// =====================================================
+
+router.get('/stats', verifyAdmin, (req, res) => {
+    const sql = `
+        SELECT
+            (SELECT COUNT(*) FROM places) AS total_places,
+            (SELECT COUNT(*) FROM categories) AS total_categories,
+            (SELECT COUNT(*) FROM users) AS total_users,
+            (SELECT COUNT(*) FROM itineraries) AS total_itineraries,
+            (SELECT COUNT(*) FROM reviews WHERE status = 'pending') AS pending_reviews,
+            (SELECT COUNT(*) FROM reviews WHERE status = 'approved') AS approved_reviews;
+    `;
+
+    db.query(sql, (err, results) => {
+        if (err) {
+            console.error('Error fetching admin statistics:', err);
+            return res.status(500).json({
+                message: 'Failed to retrieve dashboard statistics.'
+            });
+        }
+
+        const row = results[0];
+        return res.json({
+            total_places: row.total_places || 0,
+            total_categories: row.total_categories || 0,
+            total_users: row.total_users || 0,
+            total_itineraries: row.total_itineraries || 0,
+            pending_reviews: row.pending_reviews || 0,
+            approved_reviews: row.approved_reviews || 0
+        });
+    });
+});
+
+
+// =====================================================
 // GET REVIEWS FOR ADMIN MODERATION
 // Admin only (verifyAdmin)
 // GET /api/admin/reviews
