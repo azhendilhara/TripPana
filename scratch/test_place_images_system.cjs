@@ -292,11 +292,11 @@ async function runSuite() {
     assert(placeDetails.body.primary_image === finalImageList.body[0].full_url, 'primary_image reflects uploaded image');
     assert(placeDetails.body.images && placeDetails.body.images.length === 1, 'images array populated in place details');
 
-    // Check place with NO uploaded images (e.g. Place 1)
-    const place1Res = await makeRequest('GET', '/api/places/1');
-    assert(place1Res.status === 200, 'GET /api/places/1 returns HTTP 200');
+    // Check place with NO uploaded images (e.g. Place 3 - Bolgoda Lake)
+    const place3Res = await makeRequest('GET', '/api/places/3');
+    assert(place3Res.status === 200, 'GET /api/places/3 returns HTTP 200');
     assert(
-      place1Res.body.primary_image === 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e',
+      place3Res.body.primary_image === 'https://images.unsplash.com/photo-1501785888041-af3ef285b470',
       'Place without uploaded images falls back to places.image_url'
     );
 

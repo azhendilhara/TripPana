@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import resolveImageUrl, { PLACEHOLDER_IMAGE } from '../utils/imageUrl';
 import '../App.css';
 
 function AdminDashboardPage({ initialTab = 'dashboard' }) {
@@ -58,6 +59,7 @@ function AdminDashboardPage({ initialTab = 'dashboard' }) {
   const [existingPlaceImages, setExistingPlaceImages] = useState([]);
   const [loadingPlaceImages, setLoadingPlaceImages] = useState(false);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
+  const [setFirstAsPrimary, setSetFirstAsPrimary] = useState(true);
 
   // Categories state
   const [categories, setCategories] = useState([]);
@@ -232,6 +234,7 @@ function AdminDashboardPage({ initialTab = 'dashboard' }) {
     setSelectedImageFiles([]);
     setImagePreviews([]);
     setExistingPlaceImages([]);
+    setSetFirstAsPrimary(true);
     setShowPlaceModal(true);
   };
 
@@ -254,6 +257,7 @@ function AdminDashboardPage({ initialTab = 'dashboard' }) {
     setSelectedImageFiles([]);
     setImagePreviews([]);
     setExistingPlaceImages([]);
+    setSetFirstAsPrimary(true);
     fetchPlaceImages(place.place_id);
     setShowPlaceModal(true);
   };
@@ -333,6 +337,42 @@ function AdminDashboardPage({ initialTab = 'dashboard' }) {
     }
   };
 
+  const handleDirectUpload = async () => {
+    if (!editingPlace || selectedImageFiles.length === 0) return;
+    try {
+      setIsUploadingImages(true);
+      const formData = new FormData();
+      selectedImageFiles.forEach((file) => formData.append('images', file));
+      if (setFirstAsPrimary) {
+        formData.append('set_primary', 'true');
+      }
+
+      const uploadRes = await fetch(`http://localhost:5000/api/admin/places/${editingPlace.place_id}/images`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${adminToken}`
+        },
+        body: formData
+      });
+
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok) {
+        throw new Error(uploadData.message || 'Image upload failed.');
+      }
+
+      showNotify('success', `${selectedImageFiles.length} photo(s) uploaded successfully.`);
+      setSelectedImageFiles([]);
+      setImagePreviews([]);
+      await fetchPlaceImages(editingPlace.place_id);
+      await fetchPlaces();
+      await fetchStats();
+    } catch (err) {
+      showNotify('error', err.message);
+    } finally {
+      setIsUploadingImages(false);
+    }
+  };
+
   const handleSavePlace = async (e) => {
     e.preventDefault();
 
@@ -379,6 +419,9 @@ function AdminDashboardPage({ initialTab = 'dashboard' }) {
       if (selectedImageFiles.length > 0 && targetPlaceId) {
         const formData = new FormData();
         selectedImageFiles.forEach((file) => formData.append('images', file));
+        if (setFirstAsPrimary) {
+          formData.append('set_primary', 'true');
+        }
 
         const uploadRes = await fetch(`http://localhost:5000/api/admin/places/${targetPlaceId}/images`, {
           method: 'POST',
@@ -388,9 +431,10 @@ function AdminDashboardPage({ initialTab = 'dashboard' }) {
           body: formData
         });
 
+        const uploadData = await uploadRes.json();
+
         if (!uploadRes.ok) {
-          const uploadErr = await uploadRes.json();
-          showNotify('error', `Place saved, but image upload failed: ${uploadErr.message}`);
+          throw new Error(`Place details saved, but image upload failed: ${uploadData.message || 'Unknown error'}`);
         }
       }
 
@@ -398,8 +442,9 @@ function AdminDashboardPage({ initialTab = 'dashboard' }) {
       setShowPlaceModal(false);
       setSelectedImageFiles([]);
       setImagePreviews([]);
-      fetchPlaces();
-      fetchStats();
+      setSetFirstAsPrimary(true);
+      await fetchPlaces();
+      await fetchStats();
     } catch (err) {
       showNotify('error', err.message);
     } finally {
@@ -956,12 +1001,12 @@ function AdminDashboardPage({ initialTab = 'dashboard' }) {
                           </td>
                           <td>
                             <img
-                              src={place.image_url || 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee'}
+                              src={resolveImageUrl(place.primary_image || place.image_url)}
                               alt={place.title}
                               className="table-thumbnail"
                               onError={(e) => {
                                 e.target.onerror = null;
-                                e.target.src = 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee';
+                                e.target.src = PLACEHOLDER_IMAGE;
                               }}
                             />
                           </td>
@@ -1448,7 +1493,15 @@ function AdminDashboardPage({ initialTab = 'dashboard' }) {
                         <div className="existing-images-grid">
                           {existingPlaceImages.map((img) => (
                             <div key={img.image_id} className={`image-manage-card ${img.is_primary ? 'is-primary-card' : ''}`}>
-                              <img src={img.full_url} alt="Attraction" className="manage-thumb" />
+                              <img
+                                src={resolveImageUrl(img.full_url || img.image_path)}
+                                alt="Attraction"
+                                className="manage-thumb"
+                                onError={(e) => {
+                                  e.target.onerror = null;
+                                  e.target.src = PLACEHOLDER_IMAGE;
+                                }}
+                              />
                               {img.is_primary ? (
                                 <span className="primary-pill">★ PRIMARY</span>
                               ) : (
@@ -1492,8 +1545,27 @@ function AdminDashboardPage({ initialTab = 'dashboard' }) {
                     </label>
                     <span className="upload-hint">
                       {editingPlace
-                        ? 'Files selected here will be uploaded when you click "Save Changes".'
+                        ? 'Files selected here can be uploaded immediately or when clicking "Save Changes".'
                         : 'Select one or more photos. The first selected photo will automatically become the primary image.'}
+                    </span>
+                  </div>
+
+                  {/* Primary Toggle Option */}
+                  <div className="set-primary-option-row">
+                    <label className="set-primary-checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={setFirstAsPrimary}
+                        onChange={(e) => setSetFirstAsPrimary(e.target.checked)}
+                      />
+                      <span>
+                        ★ Set first newly uploaded photo as <strong>Primary (Hero) Image</strong>
+                      </span>
+                    </label>
+                    <span className="set-primary-hint">
+                      {setFirstAsPrimary
+                        ? 'The new photo will replace the current main photo on the homepage and place details.'
+                        : 'The new photo will be added to the gallery without replacing the current main photo.'}
                     </span>
                   </div>
 
@@ -1508,8 +1580,10 @@ function AdminDashboardPage({ initialTab = 'dashboard' }) {
                             <div className="preview-details">
                               <span className="preview-filename">{prev.name}</span>
                               <span className="preview-filesize">{prev.size}</span>
-                              {idx === 0 && (!editingPlace || existingPlaceImages.length === 0) && (
+                              {idx === 0 && setFirstAsPrimary ? (
                                 <span className="tag-will-be-primary">★ Will be Primary</span>
+                              ) : (
+                                <span className="tag-will-be-gallery">Gallery Photo</span>
                               )}
                             </div>
                             <button
@@ -1523,6 +1597,20 @@ function AdminDashboardPage({ initialTab = 'dashboard' }) {
                           </div>
                         ))}
                       </div>
+
+                      {editingPlace && (
+                        <div className="direct-upload-bar">
+                          <button
+                            type="button"
+                            className="btn-direct-upload"
+                            onClick={handleDirectUpload}
+                            disabled={isUploadingImages}
+                          >
+                            {isUploadingImages ? 'Uploading...' : `Upload ${imagePreviews.length} Photo(s) Now`}
+                          </button>
+                          <span className="direct-upload-note">or click "Save Changes" below to save details & upload together</span>
+                        </div>
+                      )}
                     </div>
                   )}
 

@@ -86,44 +86,75 @@ const uploadPlaceImages = (req, res) => {
       const totalImages = countRows[0].total_images;
       const primaryCount = countRows[0].primary_count;
       const nextOrder = countRows[0].max_order + 1;
-      const shouldSetFirstPrimary = totalImages === 0 || primaryCount === 0;
 
-      const insertValues = [];
-      const insertedMeta = [];
+      // Check if client explicitly requested setting the first uploaded image as primary,
+      // or if this place has no images/no primary image yet.
+      const setPrimaryRequested =
+        req.body?.set_primary === 'true' ||
+        req.body?.set_primary === true ||
+        req.body?.set_primary === '1' ||
+        req.query?.set_primary === 'true';
 
-      req.files.forEach((file, index) => {
-        const isPrimary = (shouldSetFirstPrimary && index === 0) ? 1 : 0;
-        const relativePath = `/uploads/places/${file.filename}`;
-        const order = nextOrder + index;
-        insertValues.push([placeId, relativePath, isPrimary, order]);
-        insertedMeta.push({
-          place_id: placeId,
-          image_path: relativePath,
-          full_url: getFullImageUrl(relativePath),
-          is_primary: Boolean(isPrimary),
-          display_order: order,
-          filename: file.filename
+      const shouldSetFirstPrimary =
+        totalImages === 0 || primaryCount === 0 || setPrimaryRequested;
+
+      const doInsert = () => {
+        const insertValues = [];
+        const insertedMeta = [];
+
+        req.files.forEach((file, index) => {
+          const isPrimary = (shouldSetFirstPrimary && index === 0) ? 1 : 0;
+          const relativePath = `/uploads/places/${file.filename}`;
+          const order = nextOrder + index;
+          insertValues.push([placeId, relativePath, isPrimary, order]);
+          insertedMeta.push({
+            place_id: placeId,
+            image_path: relativePath,
+            full_url: getFullImageUrl(relativePath),
+            is_primary: Boolean(isPrimary),
+            display_order: order,
+            filename: file.filename
+          });
         });
-      });
 
-      const insertSql = `
-        INSERT INTO place_images (place_id, image_path, is_primary, display_order)
-        VALUES ?;
-      `;
+        const insertSql = `
+          INSERT INTO place_images (place_id, image_path, is_primary, display_order)
+          VALUES ?;
+        `;
 
-      db.query(insertSql, [insertValues], (insertErr, result) => {
-        if (insertErr) {
-          console.error('Error saving image records:', insertErr);
-          return res.status(500).json({ message: 'Failed to record images in database' });
-        }
+        db.query(insertSql, [insertValues], (insertErr, result) => {
+          if (insertErr) {
+            console.error('Error saving image records:', insertErr);
+            return res.status(500).json({ message: 'Failed to record images in database' });
+          }
 
-        return res.status(201).json({
-          message: `${req.files.length} image(s) uploaded successfully`,
-          count: req.files.length,
-          inserted_id_start: result.insertId,
-          images: insertedMeta
+          // Assign inserted image_id to meta
+          insertedMeta.forEach((meta, idx) => {
+            meta.image_id = result.insertId + idx;
+          });
+
+          return res.status(201).json({
+            message: `${req.files.length} image(s) uploaded successfully`,
+            count: req.files.length,
+            inserted_id_start: result.insertId,
+            primary_image_id: shouldSetFirstPrimary ? result.insertId : null,
+            images: insertedMeta
+          });
         });
-      });
+      };
+
+      // If making the first uploaded image primary and there are existing images,
+      // reset existing primary flags first to maintain exactly one primary image.
+      if (shouldSetFirstPrimary && totalImages > 0) {
+        db.query('UPDATE place_images SET is_primary = 0 WHERE place_id = ?', [placeId], (resetErr) => {
+          if (resetErr) {
+            console.error('Error resetting existing primary image:', resetErr);
+          }
+          doInsert();
+        });
+      } else {
+        doInsert();
+      }
     });
   });
 };

@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import ItineraryMap from '../components/ItineraryMap';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
+import resolveImageUrl, { PLACEHOLDER_IMAGE } from '../utils/imageUrl';
 
 import '../App.css';
 
@@ -444,11 +445,12 @@ function ItineraryPage() {
                   <div className="visit-number">{index + 1}</div>
 
                   <img
-                    src={
-                      place.image_url ||
-                      'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee'
-                    }
+                    src={resolveImageUrl(place.primary_image || place.image_url)}
                     alt={place.title}
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = PLACEHOLDER_IMAGE;
+                    }}
                   />
 
                   <div className="itinerary-item-info">

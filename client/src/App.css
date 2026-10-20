@@ -3647,6 +3647,87 @@ footer p {
   margin-top: 2px;
 }
 
+.tag-will-be-gallery {
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 1px 5px;
+  border-radius: 3px;
+  width: fit-content;
+  margin-top: 2px;
+}
+
+.set-primary-option-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-top: 6px;
+  text-align: left;
+}
+
+.set-primary-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #1e293b;
+  cursor: pointer;
+  user-select: none;
+}
+
+.set-primary-checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #0b7d8e;
+  cursor: pointer;
+}
+
+.set-primary-hint {
+  font-size: 11px;
+  color: #64748b;
+  margin-left: 24px;
+}
+
+.direct-upload-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #cbd5e1;
+}
+
+.btn-direct-upload {
+  background: #0b7d8e;
+  color: #ffffff;
+  border: none;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.btn-direct-upload:hover:not(:disabled) {
+  background: #085a67;
+}
+
+.btn-direct-upload:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.direct-upload-note {
+  font-size: 11px;
+  color: #64748b;
+}
+
 .btn-remove-preview {
   position: absolute;
   top: 4px;
@@ -3694,19 +3775,15 @@ footer p {
   border-top: 1px solid #f1f5f9;
 }
 
-/* Public Place Details Gallery */
-.details-gallery-container {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.details-main-img-wrap {
+/* =====================================================
+   PLACE DETAILS HERO COVER IMAGE
+   ===================================================== */
+.details-image {
   width: 100%;
-  height: 380px;
-  border-radius: 12px;
+  height: 440px;
   overflow: hidden;
-  background: #e2e8f0;
+  position: relative;
+  background: #f1f5f9;
 }
 
 .details-hero-img {
@@ -3714,56 +3791,332 @@ footer p {
   height: 100%;
   object-fit: cover;
   display: block;
-  transition: opacity 0.25s ease;
 }
 
-.place-gallery-strip {
-  display: flex;
-  gap: 10px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-  -webkit-overflow-scrolling: touch;
+/* =====================================================
+   DEDICATED PHOTO GALLERY SECTION
+   ===================================================== */
+.place-gallery-section {
+  margin-top: 35px;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 32px;
+  box-shadow: 0 3px 16px rgba(0, 0, 0, 0.08);
 }
 
-.gallery-thumb-btn {
+.gallery-section-header {
+  margin-bottom: 24px;
+}
+
+.gallery-section-header h2 {
+  font-size: 24px;
+  color: #17383e;
+  margin: 0 0 6px 0;
+  font-weight: 700;
+}
+
+.gallery-section-header p {
+  color: #64748b;
+  font-size: 14px;
+  margin: 0;
+}
+
+.place-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.gallery-grid-item {
   position: relative;
-  width: 76px;
-  height: 56px;
-  border-radius: 8px;
+  aspect-ratio: 4 / 3;
+  width: 100%;
+  border-radius: 10px;
   overflow: hidden;
-  border: 2px solid transparent;
-  padding: 0;
-  background: #e2e8f0;
+  background: #f1f5f9;
   cursor: pointer;
-  flex-shrink: 0;
-  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  outline: none;
 }
 
-.gallery-thumb-btn img {
+.gallery-grid-item:hover,
+.gallery-grid-item:focus-visible {
+  transform: translateY(-3px) scale(1.01);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+}
+
+.gallery-grid-item:focus-visible {
+  box-shadow: 0 0 0 3px #0b7d8e;
+}
+
+.gallery-grid-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
+  transition: transform 0.35s ease;
 }
 
-.gallery-thumb-btn:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
+.gallery-grid-item:hover .gallery-grid-img {
+  transform: scale(1.04);
 }
 
-.gallery-thumb-btn.active {
-  border-color: #0b7d8e;
-  box-shadow: 0 0 0 2px rgba(11, 125, 142, 0.4);
-}
-
-.gallery-primary-badge {
+.gallery-item-overlay {
   position: absolute;
-  top: 2px;
-  right: 2px;
-  background: #0b7d8e;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.gallery-grid-item:hover .gallery-item-overlay {
+  opacity: 1;
+}
+
+.gallery-zoom-icon {
+  background: rgba(255, 255, 255, 0.92);
+  color: #0b7d8e;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  transform: scale(0.9);
+  transition: transform 0.2s ease;
+}
+
+.gallery-grid-item:hover .gallery-zoom-icon {
+  transform: scale(1);
+}
+
+.gallery-item-primary-tag {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: rgba(11, 125, 142, 0.92);
+  backdrop-filter: blur(4px);
   color: #ffffff;
-  font-size: 9px;
-  padding: 1px 4px;
-  border-radius: 3px;
-  line-height: 1.1;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  z-index: 2;
+  letter-spacing: 0.3px;
+}
+
+/* =====================================================
+   FULL-IMAGE LIGHTBOX VIEWER
+   ===================================================== */
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 15, 25, 0.88);
+  backdrop-filter: blur(8px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: lightboxFadeIn 0.2s ease;
+  user-select: none;
+}
+
+@keyframes lightboxFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.lightbox-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  max-width: 92vw;
+  max-height: 90vh;
+}
+
+.lightbox-img-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 88vw;
+  max-height: 80vh;
+}
+
+.lightbox-img {
+  max-width: 88vw;
+  max-height: 78vh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+  display: block;
+}
+
+.lightbox-close-btn {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+  font-size: 20px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 10001;
+  outline: none;
+}
+
+.lightbox-close-btn:hover,
+.lightbox-close-btn:focus-visible {
+  background: rgba(239, 68, 68, 0.85);
+  border-color: rgba(239, 68, 68, 0.85);
+  transform: scale(1.08);
+}
+
+.lightbox-nav-btn {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+  font-size: 34px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 10001;
+  line-height: 1;
+  outline: none;
+}
+
+.lightbox-nav-btn:hover,
+.lightbox-nav-btn:focus-visible {
+  background: rgba(11, 125, 142, 0.85);
+  border-color: rgba(11, 125, 142, 0.85);
+  transform: translateY(-50%) scale(1.1);
+}
+
+.lightbox-prev-btn {
+  left: 24px;
+}
+
+.lightbox-next-btn {
+  right: 24px;
+}
+
+.lightbox-info-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  color: #ffffff;
+}
+
+.lightbox-counter {
+  font-size: 14px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.18);
+  padding: 4px 14px;
+  border-radius: 20px;
+  letter-spacing: 0.5px;
+}
+
+.lightbox-primary-badge {
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffffff;
+  background: #0b7d8e;
+  padding: 3px 10px;
+  border-radius: 12px;
+}
+
+/* =====================================================
+   RESPONSIVE GALLERY & LIGHTBOX
+   ===================================================== */
+@media (max-width: 900px) {
+  .details-image {
+    height: 320px;
+  }
+
+  .place-gallery-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+
+  .lightbox-prev-btn {
+    left: 12px;
+  }
+
+  .lightbox-next-btn {
+    right: 12px;
+  }
+}
+
+@media (max-width: 600px) {
+  .details-image {
+    height: 230px;
+  }
+
+  .place-gallery-section {
+    padding: 20px 16px;
+    margin-top: 24px;
+  }
+
+  .place-gallery-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .lightbox-overlay {
+    padding: 10px;
+  }
+
+  .lightbox-img {
+    max-width: 95vw;
+    max-height: 72vh;
+  }
+
+  .lightbox-close-btn {
+    top: 12px;
+    right: 12px;
+    width: 38px;
+    height: 38px;
+    font-size: 18px;
+  }
+
+  .lightbox-nav-btn {
+    width: 42px;
+    height: 42px;
+    font-size: 26px;
+  }
+
+  .lightbox-prev-btn {
+    left: 8px;
+  }
+
+  .lightbox-next-btn {
+    right: 8px;
+  }
 }

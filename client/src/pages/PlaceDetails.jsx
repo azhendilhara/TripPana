@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
+import resolveImageUrl, { PLACEHOLDER_IMAGE } from '../utils/imageUrl';
 import '../App.css';
 
 function PlaceDetails() {
@@ -9,7 +10,7 @@ function PlaceDetails() {
   const { user, token } = useAuth();
 
   const [place, setPlace] = useState(null);
-  const [selectedImage, setSelectedImage] = useState(null);
+  const [lightboxIndex, setLightboxIndex] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -40,14 +41,65 @@ function PlaceDetails() {
 
       const data = await response.json();
       setPlace(data);
-      const initialImg = data.primary_image || data.image_url || 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee';
-      setSelectedImage(initialImg);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
   };
+
+  // Deduplicated list of gallery images
+  const galleryImages = (() => {
+    if (!place) return [];
+
+    if (Array.isArray(place.images) && place.images.length > 0) {
+      return place.images.map((img, idx) => ({
+        id: img.image_id || `img-${idx}`,
+        src: resolveImageUrl(img.full_url || img.image_path),
+        is_primary: Boolean(img.is_primary),
+        alt: `${place.title} - photo ${idx + 1}`
+      }));
+    }
+
+    if (place.image_url && typeof place.image_url === 'string' && place.image_url.trim()) {
+      return [{
+        id: 'legacy-cover',
+        src: resolveImageUrl(place.image_url),
+        is_primary: true,
+        alt: place.title
+      }];
+    }
+
+    return [];
+  })();
+
+  // Lightbox keyboard navigation & body scroll locking
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setLightboxIndex(null);
+      } else if (e.key === 'ArrowRight') {
+        if (galleryImages.length > 1) {
+          setLightboxIndex((prev) => (prev + 1) % galleryImages.length);
+        }
+      } else if (e.key === 'ArrowLeft') {
+        if (galleryImages.length > 1) {
+          setLightboxIndex((prev) => (prev - 1 + galleryImages.length) % galleryImages.length);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [lightboxIndex, galleryImages.length]);
 
   const fetchReviews = async () => {
     try {
@@ -284,37 +336,16 @@ function PlaceDetails() {
 
         <div className="details-card">
 
-          <div className="details-image details-gallery-container">
-            <div className="details-main-img-wrap">
-              <img
-                src={
-                  selectedImage ||
-                  place.primary_image ||
-                  place.image_url ||
-                  'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee'
-                }
-                alt={place.title}
-                className="details-hero-img"
-              />
-            </div>
-
-            {/* Gallery Thumbnails */}
-            {place.images && place.images.length > 1 && (
-              <div className="place-gallery-strip">
-                {place.images.map((img) => (
-                  <button
-                    key={img.image_id}
-                    type="button"
-                    className={`gallery-thumb-btn ${selectedImage === img.full_url ? 'active' : ''}`}
-                    onClick={() => setSelectedImage(img.full_url)}
-                    title={img.is_primary ? 'Primary photo' : 'View photo'}
-                  >
-                    <img src={img.full_url} alt={`${place.title} thumbnail`} />
-                    {img.is_primary && <span className="gallery-primary-badge">★</span>}
-                  </button>
-                ))}
-              </div>
-            )}
+          <div className="details-image">
+            <img
+              src={resolveImageUrl(place.primary_image || place.image_url)}
+              alt={place.title}
+              className="details-hero-img"
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = PLACEHOLDER_IMAGE;
+              }}
+            />
           </div>
 
           <div className="details-content">
@@ -421,6 +452,57 @@ function PlaceDetails() {
           </div>
 
         </div>
+
+        {/* ===============================================
+            DEDICATED PHOTO GALLERY SECTION
+            =============================================== */}
+        {galleryImages.length > 0 && (
+          <section className="place-gallery-section" aria-label="Photo gallery">
+            <div className="gallery-section-header">
+              <h2>Photo Gallery</h2>
+              <p>
+                Explore visual highlights of {place.title} ({galleryImages.length}{' '}
+                {galleryImages.length === 1 ? 'photo' : 'photos'}). Click any photo to view full size.
+              </p>
+            </div>
+
+            <div className="place-gallery-grid">
+              {galleryImages.map((img, index) => (
+                <div
+                  key={img.id}
+                  className="gallery-grid-item"
+                  onClick={() => setLightboxIndex(index)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setLightboxIndex(index);
+                    }
+                  }}
+                  aria-label={`View photo ${index + 1} of ${galleryImages.length}`}
+                >
+                  <img
+                    src={img.src}
+                    alt={img.alt}
+                    className="gallery-grid-img"
+                    loading="lazy"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = PLACEHOLDER_IMAGE;
+                    }}
+                  />
+                  <div className="gallery-item-overlay">
+                    <span className="gallery-zoom-icon">🔍</span>
+                  </div>
+                  {img.is_primary && (
+                    <span className="gallery-item-primary-tag">★ Cover Photo</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* ===============================================
             REVIEWS & VISITOR RATINGS SECTION
@@ -582,6 +664,78 @@ function PlaceDetails() {
         </section>
 
       </div>
+
+      {/* ===============================================
+          FULL-IMAGE LIGHTBOX VIEWER
+          =============================================== */}
+      {lightboxIndex !== null && galleryImages[lightboxIndex] && (
+        <div
+          className="lightbox-overlay"
+          onClick={() => setLightboxIndex(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Full size photo viewer"
+        >
+          <button
+            type="button"
+            className="lightbox-close-btn"
+            onClick={() => setLightboxIndex(null)}
+            title="Close viewer (Esc)"
+            aria-label="Close photo viewer"
+          >
+            ✕
+          </button>
+
+          {galleryImages.length > 1 && (
+            <>
+              <button
+                type="button"
+                className="lightbox-nav-btn lightbox-prev-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setLightboxIndex((prev) => (prev - 1 + galleryImages.length) % galleryImages.length);
+                }}
+                title="Previous photo (Left Arrow)"
+                aria-label="Previous photo"
+              >
+                ‹
+              </button>
+
+              <button
+                type="button"
+                className="lightbox-nav-btn lightbox-next-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setLightboxIndex((prev) => (prev + 1) % galleryImages.length);
+                }}
+                title="Next photo (Right Arrow)"
+                aria-label="Next photo"
+              >
+                ›
+              </button>
+            </>
+          )}
+
+          <div className="lightbox-content" onClick={(e) => e.stopPropagation()}>
+            <div className="lightbox-img-wrap">
+              <img
+                src={galleryImages[lightboxIndex].src}
+                alt={galleryImages[lightboxIndex].alt}
+                className="lightbox-img"
+              />
+            </div>
+
+            <div className="lightbox-info-bar">
+              <span className="lightbox-counter">
+                {lightboxIndex + 1} / {galleryImages.length}
+              </span>
+              {galleryImages[lightboxIndex].is_primary && (
+                <span className="lightbox-primary-badge">★ Cover Photo</span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

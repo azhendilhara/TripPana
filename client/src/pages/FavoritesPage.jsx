@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
+import resolveImageUrl, { PLACEHOLDER_IMAGE } from '../utils/imageUrl';
 import '../App.css';
 
 function FavoritesPage() {
@@ -147,11 +148,12 @@ function FavoritesPage() {
               <article className="place-card" key={place.favorite_id}>
                 <div className="image-container">
                   <img
-                    src={
-                      place.image_url ||
-                      'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee'
-                    }
+                    src={resolveImageUrl(place.primary_image || place.image_url)}
                     alt={place.title}
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = PLACEHOLDER_IMAGE;
+                    }}
                   />
                   <span className="category-badge">{place.category}</span>
                 </div>
