@@ -52,6 +52,13 @@ function AdminDashboardPage({ initialTab = 'dashboard' }) {
     image_url: ''
   });
 
+  // Multiple Images Management State
+  const [selectedImageFiles, setSelectedImageFiles] = useState([]);
+  const [imagePreviews, setImagePreviews] = useState([]);
+  const [existingPlaceImages, setExistingPlaceImages] = useState([]);
+  const [loadingPlaceImages, setLoadingPlaceImages] = useState(false);
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
+
   // Categories state
   const [categories, setCategories] = useState([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
@@ -188,8 +195,23 @@ function AdminDashboardPage({ initialTab = 'dashboard' }) {
   }, [activeTab]);
 
   // =====================================================
-  // PLACE ACTIONS
+  // PLACE ACTIONS & IMAGE MANAGEMENT
   // =====================================================
+
+  const fetchPlaceImages = async (placeId) => {
+    try {
+      setLoadingPlaceImages(true);
+      const res = await fetch(`http://localhost:5000/api/places/${placeId}/images`);
+      if (res.ok) {
+        const data = await res.json();
+        setExistingPlaceImages(data);
+      }
+    } catch (err) {
+      console.error('Error fetching place images:', err);
+    } finally {
+      setLoadingPlaceImages(false);
+    }
+  };
 
   const openAddPlaceModal = () => {
     setEditingPlace(null);
@@ -207,6 +229,9 @@ function AdminDashboardPage({ initialTab = 'dashboard' }) {
       travel_tips: '',
       image_url: ''
     });
+    setSelectedImageFiles([]);
+    setImagePreviews([]);
+    setExistingPlaceImages([]);
     setShowPlaceModal(true);
   };
 
@@ -226,7 +251,86 @@ function AdminDashboardPage({ initialTab = 'dashboard' }) {
       travel_tips: place.travel_tips || '',
       image_url: place.image_url || ''
     });
+    setSelectedImageFiles([]);
+    setImagePreviews([]);
+    setExistingPlaceImages([]);
+    fetchPlaceImages(place.place_id);
     setShowPlaceModal(true);
+  };
+
+  const handleFileSelection = (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+
+    const validFiles = [];
+    const newPreviews = [];
+
+    for (const file of files) {
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+        showNotify('error', `"${file.name}" is not a supported format. Please select JPEG, PNG, or WebP.`);
+        continue;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        showNotify('error', `"${file.name}" exceeds 5 MB limit (${(file.size / (1024 * 1024)).toFixed(1)} MB).`);
+        continue;
+      }
+      validFiles.push(file);
+      newPreviews.push({
+        url: URL.createObjectURL(file),
+        name: file.name,
+        size: (file.size / 1024).toFixed(0) + ' KB'
+      });
+    }
+
+    setSelectedImageFiles((prev) => [...prev, ...validFiles]);
+    setImagePreviews((prev) => [...prev, ...newPreviews]);
+  };
+
+  const removeSelectedFile = (index) => {
+    setSelectedImageFiles((prev) => prev.filter((_, i) => i !== index));
+    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSetPrimary = async (imageId) => {
+    if (!editingPlace) return;
+    try {
+      const res = await fetch(`http://localhost:5000/api/admin/places/${editingPlace.place_id}/images/${imageId}/primary`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${adminToken}`
+        }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to set primary image.');
+
+      showNotify('success', 'Primary image updated.');
+      fetchPlaceImages(editingPlace.place_id);
+      fetchPlaces();
+    } catch (err) {
+      showNotify('error', err.message);
+    }
+  };
+
+  const handleDeleteImage = async (imageId) => {
+    if (!editingPlace) return;
+    if (!window.confirm('Are you sure you want to delete this image?')) return;
+
+    try {
+      const res = await fetch(`http://localhost:5000/api/admin/places/${editingPlace.place_id}/images/${imageId}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${adminToken}`
+        }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to delete image.');
+
+      showNotify('success', 'Image deleted.');
+      fetchPlaceImages(editingPlace.place_id);
+      fetchPlaces();
+    } catch (err) {
+      showNotify('error', err.message);
+    }
   };
 
   const handleSavePlace = async (e) => {
@@ -238,6 +342,8 @@ function AdminDashboardPage({ initialTab = 'dashboard' }) {
     }
 
     try {
+      setIsUploadingImages(true);
+
       const payload = {
         ...placeForm,
         category_id: placeForm.category_id ? Number(placeForm.category_id) : null,
@@ -267,12 +373,37 @@ function AdminDashboardPage({ initialTab = 'dashboard' }) {
         throw new Error(data.message || 'Failed to save place.');
       }
 
-      showNotify('success', editingPlace ? 'Place updated successfully.' : 'Place added successfully.');
+      const targetPlaceId = editingPlace ? editingPlace.place_id : data.place_id;
+
+      // If new image files were selected, upload them now
+      if (selectedImageFiles.length > 0 && targetPlaceId) {
+        const formData = new FormData();
+        selectedImageFiles.forEach((file) => formData.append('images', file));
+
+        const uploadRes = await fetch(`http://localhost:5000/api/admin/places/${targetPlaceId}/images`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${adminToken}`
+          },
+          body: formData
+        });
+
+        if (!uploadRes.ok) {
+          const uploadErr = await uploadRes.json();
+          showNotify('error', `Place saved, but image upload failed: ${uploadErr.message}`);
+        }
+      }
+
+      showNotify('success', editingPlace ? 'Place updated successfully.' : 'Place created successfully.');
       setShowPlaceModal(false);
+      setSelectedImageFiles([]);
+      setImagePreviews([]);
       fetchPlaces();
       fetchStats();
     } catch (err) {
       showNotify('error', err.message);
+    } finally {
+      setIsUploadingImages(false);
     }
   };
 
@@ -1296,16 +1427,121 @@ function AdminDashboardPage({ initialTab = 'dashboard' }) {
                   ></textarea>
                 </div>
 
-                <div className="form-field span-3">
-                  <label htmlFor="pImg">Image URL</label>
-                  <input
-                    id="pImg"
-                    type="url"
-                    className="admin-form-input"
-                    placeholder="https://images.unsplash.com/..."
-                    value={placeForm.image_url}
-                    onChange={(e) => setPlaceForm({ ...placeForm, image_url: e.target.value })}
-                  />
+                {/* Images Upload & Management Section */}
+                <div className="form-field span-3 form-images-container">
+                  <div className="images-section-header">
+                    <label>Attraction Images</label>
+                    <span className="images-section-subtitle">
+                      Upload photos directly from your computer (JPEG, PNG, WebP — max 5 MB each)
+                    </span>
+                  </div>
+
+                  {/* Existing Images when Editing */}
+                  {editingPlace && (
+                    <div className="existing-images-panel">
+                      <span className="panel-subheading">Current Uploaded Photos ({existingPlaceImages.length}):</span>
+                      {loadingPlaceImages ? (
+                        <p className="loading-subtext">Loading images...</p>
+                      ) : existingPlaceImages.length === 0 ? (
+                        <p className="no-images-note">No uploaded photos yet. Select files below to add photos.</p>
+                      ) : (
+                        <div className="existing-images-grid">
+                          {existingPlaceImages.map((img) => (
+                            <div key={img.image_id} className={`image-manage-card ${img.is_primary ? 'is-primary-card' : ''}`}>
+                              <img src={img.full_url} alt="Attraction" className="manage-thumb" />
+                              {img.is_primary ? (
+                                <span className="primary-pill">★ PRIMARY</span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="btn-set-primary"
+                                  onClick={() => handleSetPrimary(img.image_id)}
+                                  title="Make this the main photo"
+                                >
+                                  Make Primary
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                className="btn-delete-img"
+                                onClick={() => handleDeleteImage(img.image_id)}
+                                title="Delete photo"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Upload Dropzone / Button */}
+                  <div className="file-upload-box">
+                    <input
+                      id="placeImageUploadInput"
+                      type="file"
+                      multiple
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={handleFileSelection}
+                      style={{ display: 'none' }}
+                    />
+                    <label htmlFor="placeImageUploadInput" className="btn-pick-files">
+                      <span className="upload-btn-icon">📁</span>
+                      <span>{editingPlace ? 'Select Additional Photos to Upload...' : 'Select Photos from Computer...'}</span>
+                    </label>
+                    <span className="upload-hint">
+                      {editingPlace
+                        ? 'Files selected here will be uploaded when you click "Save Changes".'
+                        : 'Select one or more photos. The first selected photo will automatically become the primary image.'}
+                    </span>
+                  </div>
+
+                  {/* Selected Previews */}
+                  {imagePreviews.length > 0 && (
+                    <div className="selected-previews-section">
+                      <span className="panel-subheading">Selected Photos Ready to Upload ({imagePreviews.length}):</span>
+                      <div className="previews-grid">
+                        {imagePreviews.map((prev, idx) => (
+                          <div key={idx} className="preview-item">
+                            <img src={prev.url} alt={prev.name} className="preview-thumb" />
+                            <div className="preview-details">
+                              <span className="preview-filename">{prev.name}</span>
+                              <span className="preview-filesize">{prev.size}</span>
+                              {idx === 0 && (!editingPlace || existingPlaceImages.length === 0) && (
+                                <span className="tag-will-be-primary">★ Will be Primary</span>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              className="btn-remove-preview"
+                              onClick={() => removeSelectedFile(idx)}
+                              title="Remove file"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Fallback URL Accordion for Backward Compatibility */}
+                  <details className="legacy-url-accordion">
+                    <summary className="legacy-accordion-toggle">
+                      <span>🔗 External Fallback URL (Optional / Legacy)</span>
+                    </summary>
+                    <div className="legacy-accordion-content">
+                      <input
+                        id="pImg"
+                        type="url"
+                        className="admin-form-input"
+                        placeholder="https://images.unsplash.com/... (used if no local photos uploaded)"
+                        value={placeForm.image_url}
+                        onChange={(e) => setPlaceForm({ ...placeForm, image_url: e.target.value })}
+                      />
+                    </div>
+                  </details>
                 </div>
               </div>
 
@@ -1314,11 +1550,12 @@ function AdminDashboardPage({ initialTab = 'dashboard' }) {
                   type="button"
                   className="btn-modal-cancel"
                   onClick={() => setShowPlaceModal(false)}
+                  disabled={isUploadingImages}
                 >
                   Cancel
                 </button>
-                <button type="submit" className="btn-modal-submit">
-                  {editingPlace ? 'Save Changes' : 'Create Place'}
+                <button type="submit" className="btn-modal-submit" disabled={isUploadingImages}>
+                  {isUploadingImages ? 'Saving & Uploading...' : editingPlace ? 'Save Changes' : 'Create Place'}
                 </button>
               </div>
             </form>

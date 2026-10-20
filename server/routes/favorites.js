@@ -32,7 +32,14 @@ router.get('/', (req, res) => {
             p.entry_fee,
             p.distance_from_panadura,
             p.image_url,
-            c.name AS category
+            c.name AS category,
+            (
+                SELECT pi.image_path
+                FROM place_images pi
+                WHERE pi.place_id = p.place_id
+                ORDER BY pi.is_primary DESC, pi.display_order ASC, pi.image_id ASC
+                LIMIT 1
+            ) AS uploaded_primary_image
         FROM favorites f
         INNER JOIN places p ON f.place_id = p.place_id
         LEFT JOIN categories c ON p.category_id = c.category_id
@@ -48,7 +55,19 @@ router.get('/', (req, res) => {
             });
         }
 
-        return res.json(results);
+        const formatted = results.map((place) => {
+            const primaryImg = place.uploaded_primary_image
+                ? (place.uploaded_primary_image.startsWith('http') ? place.uploaded_primary_image : `http://localhost:5000${place.uploaded_primary_image}`)
+                : place.image_url;
+
+            return {
+                ...place,
+                primary_image: primaryImg,
+                image_url: primaryImg
+            };
+        });
+
+        return res.json(formatted);
     });
 });
 

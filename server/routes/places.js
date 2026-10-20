@@ -1,8 +1,18 @@
 const express = require('express');
 const router = express.Router();
+const path = require('path');
+const fs = require('fs');
 
 const db = require('../config/db');
 const verifyAdmin = require('../middleware/auth');
+const { uploadMultipleImages } = require('../middleware/upload');
+const {
+    getFullImageUrl,
+    getPlaceImages,
+    uploadPlaceImages,
+    setPrimaryImage,
+    deletePlaceImage
+} = require('../controllers/placeImagesController');
 
 
 // =====================================================
@@ -18,6 +28,7 @@ router.get('/', (req, res) => {
     let sql = `
         SELECT
             p.place_id,
+            p.category_id,
             p.title,
             p.description,
             p.location,
@@ -29,7 +40,14 @@ router.get('/', (req, res) => {
             p.distance_from_panadura,
             p.travel_tips,
             p.image_url,
-            c.name AS category
+            c.name AS category,
+            (
+                SELECT pi.image_path
+                FROM place_images pi
+                WHERE pi.place_id = p.place_id
+                ORDER BY pi.is_primary DESC, pi.display_order ASC, pi.image_id ASC
+                LIMIT 1
+            ) AS uploaded_primary_image
         FROM places p
         LEFT JOIN categories c
             ON p.category_id = c.category_id
@@ -75,7 +93,19 @@ router.get('/', (req, res) => {
             });
         }
 
-        res.json(results);
+        const formatted = results.map((place) => {
+            const primaryImg = place.uploaded_primary_image
+                ? getFullImageUrl(place.uploaded_primary_image)
+                : place.image_url;
+
+            return {
+                ...place,
+                primary_image: primaryImg,
+                image_url: primaryImg // backward compatibility fallback
+            };
+        });
+
+        res.json(formatted);
 
     });
 
@@ -83,13 +113,13 @@ router.get('/', (req, res) => {
 
 
 // =====================================================
-// GET ONE PLACE BY ID
+// GET ONE PLACE BY ID (WITH FULL IMAGES GALLERY)
 // Public route
 // =====================================================
 
 router.get('/:id', (req, res) => {
 
-    const placeId = req.params.id;
+    const placeId = Number(req.params.id);
 
     if (isNaN(placeId)) {
 
@@ -138,7 +168,37 @@ router.get('/:id', (req, res) => {
             });
         }
 
-        res.json(results[0]);
+        const place = results[0];
+
+        // Fetch all uploaded gallery images for this place
+        const imagesSql = `
+            SELECT image_id, place_id, image_path, is_primary, display_order, created_at
+            FROM place_images
+            WHERE place_id = ?
+            ORDER BY is_primary DESC, display_order ASC, image_id ASC;
+        `;
+
+        db.query(imagesSql, [placeId], (imgErr, imgRows) => {
+            if (imgErr) {
+                console.error('Error fetching place images:', imgErr);
+            }
+
+            const images = (imgRows || []).map((img) => ({
+                ...img,
+                is_primary: Boolean(img.is_primary),
+                full_url: getFullImageUrl(img.image_path)
+            }));
+
+            const primaryUploaded = images.find((i) => i.is_primary)?.full_url || images[0]?.full_url;
+            const activeImage = primaryUploaded || place.image_url;
+
+            res.json({
+                ...place,
+                primary_image: activeImage,
+                image_url: activeImage,
+                images: images
+            });
+        });
 
     });
 
@@ -459,6 +519,23 @@ router.delete('/:id', verifyAdmin, (req, res) => {
     });
 
 });
+
+
+// =====================================================
+// PLACE IMAGES MANAGEMENT
+// =====================================================
+
+// GET /api/places/:id/images (Public)
+router.get('/:id/images', getPlaceImages);
+
+// POST /api/places/:id/images (Admin only)
+router.post('/:id/images', verifyAdmin, uploadMultipleImages, uploadPlaceImages);
+
+// PUT /api/places/:id/images/:imageId/primary (Admin only)
+router.put('/:id/images/:imageId/primary', verifyAdmin, setPrimaryImage);
+
+// DELETE /api/places/:id/images/:imageId (Admin only)
+router.delete('/:id/images/:imageId', verifyAdmin, deletePlaceImage);
 
 
 module.exports = router;

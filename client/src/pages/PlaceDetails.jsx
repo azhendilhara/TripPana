@@ -9,6 +9,7 @@ function PlaceDetails() {
   const { user, token } = useAuth();
 
   const [place, setPlace] = useState(null);
+  const [selectedImage, setSelectedImage] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -39,6 +40,8 @@ function PlaceDetails() {
 
       const data = await response.json();
       setPlace(data);
+      const initialImg = data.primary_image || data.image_url || 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee';
+      setSelectedImage(initialImg);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -281,16 +284,37 @@ function PlaceDetails() {
 
         <div className="details-card">
 
-          <div className="details-image">
+          <div className="details-image details-gallery-container">
+            <div className="details-main-img-wrap">
+              <img
+                src={
+                  selectedImage ||
+                  place.primary_image ||
+                  place.image_url ||
+                  'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee'
+                }
+                alt={place.title}
+                className="details-hero-img"
+              />
+            </div>
 
-            <img
-              src={
-                place.image_url ||
-                'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee'
-              }
-              alt={place.title}
-            />
-
+            {/* Gallery Thumbnails */}
+            {place.images && place.images.length > 1 && (
+              <div className="place-gallery-strip">
+                {place.images.map((img) => (
+                  <button
+                    key={img.image_id}
+                    type="button"
+                    className={`gallery-thumb-btn ${selectedImage === img.full_url ? 'active' : ''}`}
+                    onClick={() => setSelectedImage(img.full_url)}
+                    title={img.is_primary ? 'Primary photo' : 'View photo'}
+                  >
+                    <img src={img.full_url} alt={`${place.title} thumbnail`} />
+                    {img.is_primary && <span className="gallery-primary-badge">★</span>}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="details-content">

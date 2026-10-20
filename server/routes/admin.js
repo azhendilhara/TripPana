@@ -269,4 +269,25 @@ router.delete('/reviews/:id', verifyAdmin, (req, res) => {
 });
 
 
+// =====================================================
+// PLACE IMAGES MANAGEMENT (Admin Routes)
+// =====================================================
+
+const { uploadMultipleImages } = require('../middleware/upload');
+const {
+    uploadPlaceImages,
+    setPrimaryImage,
+    deletePlaceImage
+} = require('../controllers/placeImagesController');
+
+// POST /api/admin/places/:id/images
+router.post('/places/:id/images', verifyAdmin, uploadMultipleImages, uploadPlaceImages);
+
+// PUT /api/admin/places/:id/images/:imageId/primary
+router.put('/places/:id/images/:imageId/primary', verifyAdmin, setPrimaryImage);
+
+// DELETE /api/admin/places/:id/images/:imageId
+router.delete('/places/:id/images/:imageId', verifyAdmin, deletePlaceImage);
+
+
 module.exports = router;
